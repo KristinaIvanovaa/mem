@@ -625,6 +625,8 @@ async def join_game(callback: CallbackQuery):
     ])
 
     try:
+        print("DEBUG TEXT:", repr(text))  # ← добавили лог
+
         await bot.edit_message_text(
             chat_id=game["start_chat_id"],
             message_id=game["start_message_id"],
