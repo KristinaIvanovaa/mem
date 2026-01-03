@@ -1,3 +1,5 @@
+##
+
 import os
 import asyncio
 import random
@@ -15,9 +17,18 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # -----------------------------
+# Функция получения красивого имени
+# -----------------------------
+def get_display_name(user):
+    if user.username:
+        return f"@{user.username}"
+    if user.full_name:
+        return user.full_name
+    return user.first_name or "Игрок"
+
+# -----------------------------
 # СИТУАЦИИ
 # -----------------------------
-
 SITUATIONS = [
 
     "Когда будильник звенит в 6:00, а ты помнишь, что в военкомате запись только на завтра.",
@@ -494,15 +505,16 @@ SITUATIONS = [
     "Когда ты хотел писать как Бродский, но строки превратились в СМС‑сообщения."
 
 ]
+
 # -----------------------------
 # Состояние игры
 # -----------------------------
 game = {
     "waiting_players": False,
-    "players": {},
+    "players": {},  # user_id → {"name": str, "points": int}
     "round_active": False,
     "topic_message_id": None,
-    "memes": {},
+    "memes": {},  # message_id → {"user_id": int, "votes": int}
     "submitted_users": set(),
     "voted_users": set(),
     "waiting_for_situation": False,
@@ -561,17 +573,21 @@ async def join_game(callback: CallbackQuery):
         return await callback.answer("Набор игроков уже закрыт.")
 
     user = callback.from_user
+    uid = user.id
 
-    if user.id not in game["players"]:
-        game["players"][user.id] = {"name": user.full_name, "points": 0}
+    if uid not in game["players"]:
+        game["players"][uid] = {
+            "name": get_display_name(user),
+            "points": 0
+        }
         await callback.answer("Ты в игре!")
     else:
         return await callback.answer("Ты уже участвуешь.")
 
     # Обновляем стартовое сообщение
     text = "🎮 *Кто будет играть?*\n\n"
-    for p in game["players"].values():
-        safe_name = escape_md(p["name"])
+    for uid, pdata in game["players"].items():
+        safe_name = escape_md(pdata["name"])
         text += f"• {safe_name}\n"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -605,8 +621,8 @@ async def begin_game(callback: CallbackQuery):
     game["waiting_players"] = False
 
     text = "👥 *Игроки:*\n"
-    for p in game["players"].values():
-        safe_name = escape_md(p["name"])
+    for uid, pdata in game["players"].items():
+        safe_name = escape_md(pdata["name"])
         text += f"• {safe_name} — 0 баллов\n"
 
     await callback.message.answer(text, parse_mode="Markdown")
@@ -633,8 +649,7 @@ async def start_round(message: Message):
     ])
 
     msg = await message.answer(
-        f"🃏 *Ситуация:* {escape_md(topic)}\n\n"
-        "Ответьте на это сообщение мемом.",
+        f"🃏 *Ситуация:* {escape_md(topic)}\n\nОтветьте на это сообщение мемом.",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -663,8 +678,7 @@ async def change_topic(callback: CallbackQuery):
         await bot.edit_message_text(
             chat_id=callback.message.chat.id,
             message_id=callback.message.message_id,
-            text=f"🃏 *Ситуация:* {escape_md(new_topic)}\n\n"
-                 "Ответьте на это сообщение мемом.",
+            text=f"🃏 *Ситуация:* {escape_md(new_topic)}\n\nОтветьте на это сообщение мемом.",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
@@ -686,16 +700,16 @@ async def handle_meme(message: Message):
        message.reply_to_message.message_id != game["topic_message_id"]:
         return
 
-    user_id = message.from_user.id
+    uid = message.from_user.id
 
-    if user_id not in game["players"]:
+    if uid not in game["players"]:
         return await message.reply("Ты не участвуешь в игре.")
 
-    if user_id in game["submitted_users"]:
+    if uid in game["submitted_users"]:
         return await message.reply("Ты уже прислал мем.")
 
-    game["submitted_users"].add(user_id)
-    game["memes"][message.message_id] = {"user_id": user_id, "votes": 0}
+    game["submitted_users"].add(uid)
+    game["memes"][message.message_id] = {"user_id": uid, "votes": 0}
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👍 Голос", callback_data=f"vote:{message.message_id}")]
@@ -749,9 +763,9 @@ async def finish_round(message: Message):
     game["round_active"] = False
 
     text = "🏆 *Голосование завершено!*\n\n*Баллы игроков:*\n"
-    for p in game["players"].values():
-        safe_name = escape_md(p["name"])
-        text += f"• {safe_name} — {p['points']} баллов\n"
+    for uid, pdata in game["players"].items():
+        safe_name = escape_md(pdata["name"])
+        text += f"• {safe_name} — {pdata['points']} баллов\n"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💡 Предложить ситуацию", callback_data="suggest")],
@@ -770,12 +784,12 @@ async def suggest(callback: CallbackQuery):
     if game["game_finished"]:
         return await callback.answer("Игра завершена.")
 
-    user_id = callback.from_user.id
+    uid = callback.from_user.id
     game["waiting_for_situation"] = True
-    game["situation_author"] = user_id
+    game["situation_author"] = uid
 
     await callback.message.answer(
-        f"<a href='tg://user?id={user_id}'>Игрок</a>, напиши свою ситуацию.",
+        f"<a href='tg://user?id={uid}'>Игрок</a>, напиши свою ситуацию.",
         parse_mode="HTML"
     )
 
@@ -848,9 +862,9 @@ async def stop_game(callback: CallbackQuery):
         pass
 
     text = "🎉 *Игра завершена!*\n\nИтоговые баллы:\n"
-    for p in game["players"].values():
-        safe_name = escape_md(p["name"])
-        text += f"• {safe_name} — {p['points']} баллов\n"
+    for uid, pdata in game["players"].items():
+        safe_name = escape_md(pdata["name"])
+        text += f"• {safe_name} — {pdata['points']} баллов\n"
 
     await callback.message.answer(text, parse_mode="Markdown")
     await callback.answer("Игра завершена.")
