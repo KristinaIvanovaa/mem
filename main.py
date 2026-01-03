@@ -1,10 +1,10 @@
-
-####
 import os
 import asyncio
 import random
 import html
 from aiogram import Bot, Dispatcher, F
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.types import (
     Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 )
@@ -13,7 +13,10 @@ from aiogram.filters import Command
 # Читаем токен из переменной окружения
 TOKEN = os.getenv("BOT_TOKEN")
 
-bot = Bot(token=TOKEN)
+bot = Bot(
+    token=TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 dp = Dispatcher()
 
 # -----------------------------
@@ -511,7 +514,6 @@ SITUATIONS = [
     "Когда ты хотел писать как Бродский, но строки превратились в СМС‑сообщения."
 
 ]
-
 # -----------------------------
 # Состояние игры
 # -----------------------------
@@ -530,18 +532,12 @@ game = {
     "start_chat_id": None
 }
 
-# -----------------------------
-# Команда: старт игры
-# -----------------------------
-@dp.message(Command("start_game"))
-async def start_game(message: Message):
-    if message.chat.type not in ("group", "supergroup"):
-        return await message.answer("Этот бот работает только в группах.")
-
+def reset_game():
     game.update({
-        "waiting_players": True,
+        "waiting_players": False,
         "players": {},
         "round_active": False,
+        "topic_message_id": None,
         "memes": {},
         "submitted_users": set(),
         "voted_users": set(),
@@ -552,6 +548,17 @@ async def start_game(message: Message):
         "start_chat_id": None
     })
 
+# -----------------------------
+# Команда: старт игры
+# -----------------------------
+@dp.message(Command("start_game"))
+async def start_game(message: Message):
+    if message.chat.type not in ("group", "supergroup"):
+        return await message.answer("Этот бот работает только в группах.")
+
+    reset_game()
+    game["waiting_players"] = True
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🟢 Я играю!", callback_data="join")],
         [InlineKeyboardButton(text="▶ Начать игру", callback_data="begin_game")]
@@ -559,13 +566,11 @@ async def start_game(message: Message):
 
     msg = await message.answer(
         "🎮 <b>Кто будет играть?</b>\nНажмите кнопку ниже, чтобы участвовать.",
-        reply_markup=keyboard,
-        parse_mode="HTML"
+        reply_markup=keyboard
     )
 
     game["start_message_id"] = msg.message_id
     game["start_chat_id"] = msg.chat.id
-
 
 # -----------------------------
 # Присоединение игрока
@@ -605,8 +610,7 @@ async def join_game(callback: CallbackQuery):
             chat_id=game["start_chat_id"],
             message_id=game["start_message_id"],
             text=text,
-            reply_markup=keyboard,
-            parse_mode="HTML"
+            reply_markup=keyboard
         )
     except Exception as e:
         print("Ошибка обновления стартового сообщения:", e)
@@ -631,10 +635,9 @@ async def begin_game(callback: CallbackQuery):
     for pdata in game["players"].values():
         text += f"• {sanitize(pdata['name'])} — 0 баллов\n"
 
-    await callback.message.answer(text, parse_mode="HTML")
+    await callback.message.answer(text)
 
     await start_round(callback.message)
-
 
 # -----------------------------
 # Запуск раунда
@@ -656,12 +659,10 @@ async def start_round(message: Message):
 
     msg = await message.answer(
         f"🃏 <b>Ситуация:</b> {sanitize(topic)}\n\nОтветьте на это сообщение мемом.",
-        reply_markup=keyboard,
-        parse_mode="HTML"
+        reply_markup=keyboard
     )
 
     game["topic_message_id"] = msg.message_id
-
 
 # -----------------------------
 # Смена ситуации
@@ -685,14 +686,12 @@ async def change_topic(callback: CallbackQuery):
             chat_id=callback.message.chat.id,
             message_id=callback.message.message_id,
             text=f"🃏 <b>Ситуация:</b> {sanitize(new_topic)}\n\nОтветьте на это сообщение мемом.",
-            reply_markup=keyboard,
-            parse_mode="HTML"
+            reply_markup=keyboard
         )
     except Exception as e:
         print("Ошибка смены ситуации:", e)
 
     await callback.answer("Ситуация обновлена!")
-
 
 # -----------------------------
 # Приём мемов
@@ -725,7 +724,6 @@ async def handle_meme(message: Message):
 
     if len(game["submitted_users"]) == len(game["players"]):
         await message.answer("Все игроки прислали мемы. Начинается голосование!")
-
 
 # -----------------------------
 # Голосование
@@ -761,7 +759,6 @@ async def vote_callback(callback: CallbackQuery):
     if len(game["voted_users"]) == len(game["players"]):
         await finish_round(callback.message)
 
-
 # -----------------------------
 # Завершение раунда
 # -----------------------------
@@ -778,8 +775,7 @@ async def finish_round(message: Message):
         [InlineKeyboardButton(text="⛔ Закончить игру", callback_data="stop")]
     ])
 
-    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
-
+    await message.answer(text, reply_markup=keyboard)
 
 # -----------------------------
 # Предложить ситуацию
@@ -794,12 +790,10 @@ async def suggest(callback: CallbackQuery):
     game["situation_author"] = uid
 
     await callback.message.answer(
-        f"<a href='tg://user?id={uid}'>Игрок</a>, напиши свою ситуацию.",
-        parse_mode="HTML"
+        f"<a href='tg://user?id={uid}'>Игрок</a>, напиши свою ситуацию."
     )
 
     await callback.answer()
-
 
 # -----------------------------
 # Приём кастомной ситуации
@@ -819,7 +813,6 @@ async def receive_situation(message: Message):
 
     await start_custom_round(message.chat, situation)
 
-
 # -----------------------------
 # Запуск кастомного раунда
 # -----------------------------
@@ -831,12 +824,10 @@ async def start_custom_round(chat, situation):
 
     msg = await bot.send_message(
         chat.id,
-        f"🃏 <b>Ситуация от игрока:</b> {sanitize(situation)}\n\nОтветьте мемом.",
-        parse_mode="HTML"
+        f"🃏 <b>Ситуация от игрока:</b> {sanitize(situation)}\n\nОтветьте мемом."
     )
 
     game["topic_message_id"] = msg.message_id
-
 
 # -----------------------------
 # Следующий раунд
@@ -848,7 +839,6 @@ async def next_round(callback: CallbackQuery):
 
     await callback.answer()
     await start_round(callback.message)
-
 
 # -----------------------------
 # Завершить игру
@@ -870,9 +860,11 @@ async def stop_game(callback: CallbackQuery):
     for pdata in game["players"].values():
         text += f"• {sanitize(pdata['name'])} — {pdata['points']} баллов\n"
 
-    await callback.message.answer(text, parse_mode="HTML")
+    await callback.message.answer(text)
     await callback.answer("Игра завершена.")
 
+    # Полный сброс состояния для новой игры
+    reset_game()
 
 # -----------------------------
 # Запуск бота
