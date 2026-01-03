@@ -1,5 +1,3 @@
-##
-
 import os
 import asyncio
 import random
@@ -8,7 +6,6 @@ from aiogram.types import (
     Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 )
 from aiogram.filters import Command
-from aiogram.utils.markdown import escape_md
 
 # Читаем токен из переменной окружения
 TOKEN = os.getenv("BOT_TOKEN")
@@ -552,9 +549,9 @@ async def start_game(message: Message):
     ])
 
     msg = await message.answer(
-        "🎮 *Кто будет играть?*\nНажмите кнопку ниже, чтобы участвовать.",
+        "🎮 <b>Кто будет играть?</b>\nНажмите кнопку ниже, чтобы участвовать.",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
     game["start_message_id"] = msg.message_id
@@ -585,10 +582,9 @@ async def join_game(callback: CallbackQuery):
         return await callback.answer("Ты уже участвуешь.")
 
     # Обновляем стартовое сообщение
-    text = "🎮 *Кто будет играть?*\n\n"
-    for uid, pdata in game["players"].items():
-        safe_name = escape_md(pdata["name"])
-        text += f"• {safe_name}\n"
+    text = "🎮 <b>Кто будет играть?</b>\n\n"
+    for pdata in game["players"].values():
+        text += f"• {pdata['name']}\n"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🟢 Я играю!", callback_data="join")],
@@ -600,7 +596,7 @@ async def join_game(callback: CallbackQuery):
         message_id=game["start_message_id"],
         text=text,
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
 
@@ -620,12 +616,11 @@ async def begin_game(callback: CallbackQuery):
 
     game["waiting_players"] = False
 
-    text = "👥 *Игроки:*\n"
-    for uid, pdata in game["players"].items():
-        safe_name = escape_md(pdata["name"])
-        text += f"• {safe_name} — 0 баллов\n"
+    text = "👥 <b>Игроки:</b>\n"
+    for pdata in game["players"].values():
+        text += f"• {pdata['name']} — 0 баллов\n"
 
-    await callback.message.answer(text, parse_mode="Markdown")
+    await callback.message.answer(text, parse_mode="HTML")
 
     await start_round(callback.message)
 
@@ -649,9 +644,9 @@ async def start_round(message: Message):
     ])
 
     msg = await message.answer(
-        f"🃏 *Ситуация:* {escape_md(topic)}\n\nОтветьте на это сообщение мемом.",
+        f"🃏 <b>Ситуация:</b> {topic}\n\nОтветьте на это сообщение мемом.",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
     game["topic_message_id"] = msg.message_id
@@ -678,9 +673,9 @@ async def change_topic(callback: CallbackQuery):
         await bot.edit_message_text(
             chat_id=callback.message.chat.id,
             message_id=callback.message.message_id,
-            text=f"🃏 *Ситуация:* {escape_md(new_topic)}\n\nОтветьте на это сообщение мемом.",
+            text=f"🃏 <b>Ситуация:</b> {new_topic}\n\nОтветьте на это сообщение мемом.",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     except:
         pass
@@ -762,10 +757,9 @@ async def vote_callback(callback: CallbackQuery):
 async def finish_round(message: Message):
     game["round_active"] = False
 
-    text = "🏆 *Голосование завершено!*\n\n*Баллы игроков:*\n"
-    for uid, pdata in game["players"].items():
-        safe_name = escape_md(pdata["name"])
-        text += f"• {safe_name} — {pdata['points']} баллов\n"
+    text = "🏆 <b>Голосование завершено!</b>\n\n<b>Баллы игроков:</b>\n"
+    for pdata in game["players"].values():
+        text += f"• {pdata['name']} — {pdata['points']} баллов\n"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💡 Предложить ситуацию", callback_data="suggest")],
@@ -773,7 +767,7 @@ async def finish_round(message: Message):
         [InlineKeyboardButton(text="⛔ Закончить игру", callback_data="stop")]
     ])
 
-    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 
 # -----------------------------
@@ -826,8 +820,8 @@ async def start_custom_round(chat, situation):
 
     msg = await bot.send_message(
         chat.id,
-        f"🃏 *Ситуация от игрока:* {escape_md(situation)}\n\nОтветьте мемом.",
-        parse_mode="Markdown"
+        f"🃏 <b>Ситуация от игрока:</b> {situation}\n\nОтветьте мемом.",
+        parse_mode="HTML"
     )
 
     game["topic_message_id"] = msg.message_id
@@ -861,12 +855,11 @@ async def stop_game(callback: CallbackQuery):
     except:
         pass
 
-    text = "🎉 *Игра завершена!*\n\nИтоговые баллы:\n"
-    for uid, pdata in game["players"].items():
-        safe_name = escape_md(pdata["name"])
-        text += f"• {safe_name} — {pdata['points']} баллов\n"
+    text = "🎉 <b>Игра завершена!</b>\n\nИтоговые баллы:\n"
+    for pdata in game["players"].values():
+        text += f"• {pdata['name']} — {pdata['points']} баллов\n"
 
-    await callback.message.answer(text, parse_mode="Markdown")
+    await callback.message.answer(text, parse_mode="HTML")
     await callback.answer("Игра завершена.")
 
 
