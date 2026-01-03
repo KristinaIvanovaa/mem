@@ -2,6 +2,7 @@ import os
 import asyncio
 import random
 import html
+import re
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -10,8 +11,10 @@ from aiogram.types import (
 )
 from aiogram.filters import Command
 
+
 # Читаем токен из переменной окружения
 TOKEN = os.getenv("BOT_TOKEN")
+
 
 bot = Bot(
     token=TOKEN,
@@ -19,21 +22,32 @@ bot = Bot(
 )
 dp = Dispatcher()
 
+
 # -----------------------------
-# Экранирование HTML
+# Очистка и экранирование имени
 # -----------------------------
+def clean_name(name: str) -> str:
+    # Убираем все подозрительные символы, оставляем буквы, цифры и несколько безопасных знаков
+    # Если хочется мягче — расширь набор разрешённых.
+    return re.sub(r"[^0-9A-Za-zА-Яа-яЁё @._\-]", "", name)
+
+
 def sanitize(text: str) -> str:
     return html.escape(text, quote=True)
+
 
 # -----------------------------
 # Функция получения красивого имени
 # -----------------------------
 def get_display_name(user):
     if user.username:
-        return f"@{user.username}"
-    if user.full_name:
-        return user.full_name
-    return user.first_name or "Игрок"
+        raw = f"@{user.username}"
+    elif user.full_name:
+        raw = user.full_name
+    else:
+        raw = user.first_name or "Игрок"
+    return clean_name(raw)
+
 
 # -----------------------------
 # СИТУАЦИИ
@@ -514,6 +528,8 @@ SITUATIONS = [
     "Когда ты хотел писать как Бродский, но строки превратились в СМС‑сообщения."
 
 ]
+
+
 # -----------------------------
 # Состояние игры
 # -----------------------------
@@ -532,6 +548,7 @@ game = {
     "start_chat_id": None
 }
 
+
 def reset_game():
     game.update({
         "waiting_players": False,
@@ -547,6 +564,7 @@ def reset_game():
         "start_message_id": None,
         "start_chat_id": None
     })
+
 
 # -----------------------------
 # Команда: старт игры
@@ -571,6 +589,7 @@ async def start_game(message: Message):
 
     game["start_message_id"] = msg.message_id
     game["start_chat_id"] = msg.chat.id
+
 
 # -----------------------------
 # Присоединение игрока
@@ -615,6 +634,7 @@ async def join_game(callback: CallbackQuery):
     except Exception as e:
         print("Ошибка обновления стартового сообщения:", e)
 
+
 # -----------------------------
 # Начать игру
 # -----------------------------
@@ -633,11 +653,11 @@ async def begin_game(callback: CallbackQuery):
 
     text = "👥 <b>Игроки:</b>\n"
     for pdata in game["players"].values():
-        text += f"• {sanitize(pdata['name'])} — 0 баллов\n"
+        text += f"• {sanitize(pdata['name'])} — {pdata['points']} баллов\n"
 
     await callback.message.answer(text)
-
     await start_round(callback.message)
+
 
 # -----------------------------
 # Запуск раунда
@@ -663,6 +683,7 @@ async def start_round(message: Message):
     )
 
     game["topic_message_id"] = msg.message_id
+
 
 # -----------------------------
 # Смена ситуации
@@ -692,6 +713,7 @@ async def change_topic(callback: CallbackQuery):
         print("Ошибка смены ситуации:", e)
 
     await callback.answer("Ситуация обновлена!")
+
 
 # -----------------------------
 # Приём мемов
@@ -724,6 +746,7 @@ async def handle_meme(message: Message):
 
     if len(game["submitted_users"]) == len(game["players"]):
         await message.answer("Все игроки прислали мемы. Начинается голосование!")
+
 
 # -----------------------------
 # Голосование
@@ -759,6 +782,7 @@ async def vote_callback(callback: CallbackQuery):
     if len(game["voted_users"]) == len(game["players"]):
         await finish_round(callback.message)
 
+
 # -----------------------------
 # Завершение раунда
 # -----------------------------
@@ -776,6 +800,7 @@ async def finish_round(message: Message):
     ])
 
     await message.answer(text, reply_markup=keyboard)
+
 
 # -----------------------------
 # Предложить ситуацию
@@ -795,6 +820,7 @@ async def suggest(callback: CallbackQuery):
 
     await callback.answer()
 
+
 # -----------------------------
 # Приём кастомной ситуации
 # -----------------------------
@@ -813,6 +839,7 @@ async def receive_situation(message: Message):
 
     await start_custom_round(message.chat, situation)
 
+
 # -----------------------------
 # Запуск кастомного раунда
 # -----------------------------
@@ -829,6 +856,7 @@ async def start_custom_round(chat, situation):
 
     game["topic_message_id"] = msg.message_id
 
+
 # -----------------------------
 # Следующий раунд
 # -----------------------------
@@ -839,6 +867,7 @@ async def next_round(callback: CallbackQuery):
 
     await callback.answer()
     await start_round(callback.message)
+
 
 # -----------------------------
 # Завершить игру
@@ -863,8 +892,8 @@ async def stop_game(callback: CallbackQuery):
     await callback.message.answer(text)
     await callback.answer("Игра завершена.")
 
-    # Полный сброс состояния для новой игры
     reset_game()
+
 
 # -----------------------------
 # Запуск бота
@@ -872,5 +901,7 @@ async def stop_game(callback: CallbackQuery):
 async def main():
     await dp.start_polling(bot)
 
+
 if __name__ == "__main__":
     asyncio.run(main())
+ы
