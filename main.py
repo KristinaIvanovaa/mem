@@ -1,6 +1,9 @@
+
+####
 import os
 import asyncio
 import random
+import html
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
     Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -12,6 +15,12 @@ TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+# -----------------------------
+# Экранирование HTML
+# -----------------------------
+def sanitize(text: str) -> str:
+    return html.escape(text, quote=True)
 
 # -----------------------------
 # Функция получения красивого имени
@@ -584,21 +593,23 @@ async def join_game(callback: CallbackQuery):
     # Обновляем стартовое сообщение
     text = "🎮 <b>Кто будет играть?</b>\n\n"
     for pdata in game["players"].values():
-        text += f"• {pdata['name']}\n"
+        text += f"• {sanitize(pdata['name'])}\n"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🟢 Я играю!", callback_data="join")],
         [InlineKeyboardButton(text="▶ Начать игру", callback_data="begin_game")]
     ])
 
-    await bot.edit_message_text(
-        chat_id=game["start_chat_id"],
-        message_id=game["start_message_id"],
-        text=text,
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
-
+    try:
+        await bot.edit_message_text(
+            chat_id=game["start_chat_id"],
+            message_id=game["start_message_id"],
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        print("Ошибка обновления стартового сообщения:", e)
 
 # -----------------------------
 # Начать игру
@@ -618,7 +629,7 @@ async def begin_game(callback: CallbackQuery):
 
     text = "👥 <b>Игроки:</b>\n"
     for pdata in game["players"].values():
-        text += f"• {pdata['name']} — 0 баллов\n"
+        text += f"• {sanitize(pdata['name'])} — 0 баллов\n"
 
     await callback.message.answer(text, parse_mode="HTML")
 
@@ -644,7 +655,7 @@ async def start_round(message: Message):
     ])
 
     msg = await message.answer(
-        f"🃏 <b>Ситуация:</b> {topic}\n\nОтветьте на это сообщение мемом.",
+        f"🃏 <b>Ситуация:</b> {sanitize(topic)}\n\nОтветьте на это сообщение мемом.",
         reply_markup=keyboard,
         parse_mode="HTML"
     )
@@ -673,12 +684,12 @@ async def change_topic(callback: CallbackQuery):
         await bot.edit_message_text(
             chat_id=callback.message.chat.id,
             message_id=callback.message.message_id,
-            text=f"🃏 <b>Ситуация:</b> {new_topic}\n\nОтветьте на это сообщение мемом.",
+            text=f"🃏 <b>Ситуация:</b> {sanitize(new_topic)}\n\nОтветьте на это сообщение мемом.",
             reply_markup=keyboard,
             parse_mode="HTML"
         )
-    except:
-        pass
+    except Exception as e:
+        print("Ошибка смены ситуации:", e)
 
     await callback.answer("Ситуация обновлена!")
 
@@ -759,7 +770,7 @@ async def finish_round(message: Message):
 
     text = "🏆 <b>Голосование завершено!</b>\n\n<b>Баллы игроков:</b>\n"
     for pdata in game["players"].values():
-        text += f"• {pdata['name']} — {pdata['points']} баллов\n"
+        text += f"• {sanitize(pdata['name'])} — {pdata['points']} баллов\n"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💡 Предложить ситуацию", callback_data="suggest")],
@@ -820,7 +831,7 @@ async def start_custom_round(chat, situation):
 
     msg = await bot.send_message(
         chat.id,
-        f"🃏 <b>Ситуация от игрока:</b> {situation}\n\nОтветьте мемом.",
+        f"🃏 <b>Ситуация от игрока:</b> {sanitize(situation)}\n\nОтветьте мемом.",
         parse_mode="HTML"
     )
 
@@ -857,7 +868,7 @@ async def stop_game(callback: CallbackQuery):
 
     text = "🎉 <b>Игра завершена!</b>\n\nИтоговые баллы:\n"
     for pdata in game["players"].values():
-        text += f"• {pdata['name']} — {pdata['points']} баллов\n"
+        text += f"• {sanitize(pdata['name'])} — {pdata['points']} баллов\n"
 
     await callback.message.answer(text, parse_mode="HTML")
     await callback.answer("Игра завершена.")
