@@ -1,11 +1,8 @@
 import os
 import asyncio
 import random
-import html
 import re
 from aiogram import Bot, Dispatcher, F
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 from aiogram.types import (
     Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 )
@@ -15,25 +12,21 @@ from aiogram.filters import Command
 # Читаем токен из переменной окружения
 TOKEN = os.getenv("BOT_TOKEN")
 
-
-bot = Bot(
-    token=TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-)
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 
 # -----------------------------
-# Очистка и экранирование имени
+# Очистка имени (без HTML/Markdown)
 # -----------------------------
 def clean_name(name: str) -> str:
-    # Убираем все подозрительные символы, оставляем буквы, цифры и несколько безопасных знаков
-    # Если хочется мягче — расширь набор разрешённых.
+    # Оставляем только более-менее безопасные символы
     return re.sub(r"[^0-9A-Za-zА-Яа-яЁё @._\-]", "", name)
 
 
 def sanitize(text: str) -> str:
-    return html.escape(text, quote=True)
+    # В режиме без parse_mode достаточно убедиться, что это строка
+    return str(text)
 
 
 # -----------------------------
@@ -583,7 +576,7 @@ async def start_game(message: Message):
     ])
 
     msg = await message.answer(
-        "🎮 <b>Кто будет играть?</b>\nНажмите кнопку ниже, чтобы участвовать.",
+        "🎮 Кто будет играть?\nНажмите кнопку ниже, чтобы участвовать.",
         reply_markup=keyboard
     )
 
@@ -615,7 +608,7 @@ async def join_game(callback: CallbackQuery):
         return await callback.answer("Ты уже участвуешь.")
 
     # Обновляем стартовое сообщение
-    text = "🎮 <b>Кто будет играть?</b>\n\n"
+    text = "🎮 Кто будет играть?\n\n"
     for pdata in game["players"].values():
         text += f"• {sanitize(pdata['name'])}\n"
 
@@ -625,8 +618,6 @@ async def join_game(callback: CallbackQuery):
     ])
 
     try:
-        print("DEBUG TEXT:", repr(text))  # ← добавили лог
-
         await bot.edit_message_text(
             chat_id=game["start_chat_id"],
             message_id=game["start_message_id"],
@@ -653,7 +644,7 @@ async def begin_game(callback: CallbackQuery):
 
     game["waiting_players"] = False
 
-    text = "👥 <b>Игроки:</b>\n"
+    text = "👥 Игроки:\n"
     for pdata in game["players"].values():
         text += f"• {sanitize(pdata['name'])} — {pdata['points']} баллов\n"
 
@@ -680,7 +671,7 @@ async def start_round(message: Message):
     ])
 
     msg = await message.answer(
-        f"🃏 <b>Ситуация:</b> {sanitize(topic)}\n\nОтветьте на это сообщение мемом.",
+        f"🃏 Ситуация: {sanitize(topic)}\n\nОтветьте на это сообщение мемом.",
         reply_markup=keyboard
     )
 
@@ -708,7 +699,7 @@ async def change_topic(callback: CallbackQuery):
         await bot.edit_message_text(
             chat_id=callback.message.chat.id,
             message_id=callback.message.message_id,
-            text=f"🃏 <b>Ситуация:</b> {sanitize(new_topic)}\n\nОтветьте на это сообщение мемом.",
+            text=f"🃏 Ситуация: {sanitize(new_topic)}\n\nОтветьте на это сообщение мемом.",
             reply_markup=keyboard
         )
     except Exception as e:
@@ -791,7 +782,7 @@ async def vote_callback(callback: CallbackQuery):
 async def finish_round(message: Message):
     game["round_active"] = False
 
-    text = "🏆 <b>Голосование завершено!</b>\n\n<b>Баллы игроков:</b>\n"
+    text = "🏆 Голосование завершено!\n\nБаллы игроков:\n"
     for pdata in game["players"].values():
         text += f"• {sanitize(pdata['name'])} — {pdata['points']} баллов\n"
 
@@ -817,7 +808,7 @@ async def suggest(callback: CallbackQuery):
     game["situation_author"] = uid
 
     await callback.message.answer(
-        f"<a href='tg://user?id={uid}'>Игрок</a>, напиши свою ситуацию."
+        f"Игрок {uid}, напиши свою ситуацию."
     )
 
     await callback.answer()
@@ -853,7 +844,7 @@ async def start_custom_round(chat, situation):
 
     msg = await bot.send_message(
         chat.id,
-        f"🃏 <b>Ситуация от игрока:</b> {sanitize(situation)}\n\nОтветьте мемом."
+        f"🃏 Ситуация от игрока: {sanitize(situation)}\n\nОтветьте мемом."
     )
 
     game["topic_message_id"] = msg.message_id
@@ -887,7 +878,7 @@ async def stop_game(callback: CallbackQuery):
     except:
         pass
 
-    text = "🎉 <b>Игра завершена!</b>\n\nИтоговые баллы:\n"
+    text = "🎉 Игра завершена!\n\nИтоговые баллы:\n"
     for pdata in game["players"].values():
         text += f"• {sanitize(pdata['name'])} — {pdata['points']} баллов\n"
 
@@ -906,4 +897,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-ы
