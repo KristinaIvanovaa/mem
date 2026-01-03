@@ -16,7 +16,6 @@ dp = Dispatcher()
 # -----------------------------
 # СИТУАЦИИ
 # -----------------------------
-
 SITUATIONS = [
 
     "Когда будильник звенит в 6:00, а ты помнишь, что в военкомате запись только на завтра.",
@@ -479,7 +478,7 @@ SITUATIONS = [
     "Когда ты решил стать как Илон Маск, но твои ракеты — это воздушные шарики.",
     "Когда ты собрался на рыбалку с Задорновым, но рыба рассказала анекдот и уплыла.",
     "Когда ты хотел говорить как Жириновский, но фразы превратились в стихи Пушкина.",
-    "Когда ты купил новый холодильник, но он замораживает только воздух „из принципа“.",
+    "Когда ты купил новый холодфильник, но он замораживает только воздух „из принципа“.",
     "Когда ты решил снять фильм как Михалков, но камера показала только твой нос.",
 
     "Когда ты хотел быть как Ургант, но шутки вызвали слёзы „от безысходности“.",
@@ -539,9 +538,9 @@ async def start_game(message: Message):
     ])
 
     msg = await message.answer(
-        "🎮 *Кто будет играть?*\nНажмите кнопку ниже, чтобы участвовать.",
+        "🎮 <b>Кто будет играть?</b>\nНажмите кнопку ниже, чтобы участвовать.",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
     game["start_message_id"] = msg.message_id
@@ -567,8 +566,7 @@ async def join_game(callback: CallbackQuery):
     else:
         return await callback.answer("Ты уже участвуешь.")
 
-    # Обновляем стартовое сообщение
-    text = "🎮 *Кто будет играть?*\n\n"
+    text = "🎮 <b>Кто будет играть?</b>\n\n"
     for p in game["players"].values():
         text += f"• {p['name']}\n"
 
@@ -582,7 +580,7 @@ async def join_game(callback: CallbackQuery):
         message_id=game["start_message_id"],
         text=text,
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
 
@@ -602,11 +600,11 @@ async def begin_game(callback: CallbackQuery):
 
     game["waiting_players"] = False
 
-    text = "👥 *Игроки:*\n"
+    text = "👥 <b>Игроки:</b>\n"
     for p in game["players"].values():
         text += f"• {p['name']} — 0 баллов\n"
 
-    await callback.message.answer(text, parse_mode="Markdown")
+    await callback.message.answer(text, parse_mode="HTML")
 
     await start_round(callback.message)
 
@@ -630,10 +628,9 @@ async def start_round(message: Message):
     ])
 
     msg = await message.answer(
-        f"🃏 *Ситуация:* {topic}\n\n"
-        "Ответьте на это сообщение мемом.",
+        f"🃏 <b>Ситуация:</b> {topic}\n\nОтветьте на это сообщение мемом.",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
     game["topic_message_id"] = msg.message_id
@@ -660,10 +657,9 @@ async def change_topic(callback: CallbackQuery):
         await bot.edit_message_text(
             chat_id=callback.message.chat.id,
             message_id=callback.message.message_id,
-            text=f"🃏 *Ситуация:* {new_topic}\n\n"
-                 "Ответьте на это сообщение мемом.",
+            text=f"🃏 <b>Ситуация:</b> {new_topic}\n\nОтветьте на это сообщение мемом.",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     except:
         pass
@@ -745,9 +741,7 @@ async def vote_callback(callback: CallbackQuery):
 async def finish_round(message: Message):
     game["round_active"] = False
 
-    text = "🏆 *Голосование завершено!*\n\n"
-    text += "*Баллы игроков:*\n"
-
+    text = "🏆 <b>Голосование завершено!</b>\n\n<b>Баллы игроков:</b>\n"
     for p in game["players"].values():
         text += f"• {p['name']} — {p['points']} баллов\n"
 
@@ -757,7 +751,7 @@ async def finish_round(message: Message):
         [InlineKeyboardButton(text="⛔ Закончить игру", callback_data="stop")]
     ])
 
-    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 
 # -----------------------------
@@ -810,8 +804,8 @@ async def start_custom_round(chat, situation):
 
     msg = await bot.send_message(
         chat.id,
-        f"🃏 *Ситуация от игрока:* {situation}\n\nОтветьте мемом.",
-        parse_mode="Markdown"
+        f"🃏 <b>Ситуация от игрока:</b> {situation}\n\nОтветьте мемом.",
+        parse_mode="HTML"
     )
 
     game["topic_message_id"] = msg.message_id
@@ -845,11 +839,11 @@ async def stop_game(callback: CallbackQuery):
     except:
         pass
 
-    text = "🎉 *Игра завершена!*\n\nИтоговые баллы:\n"
+    text = "🎉 <b>Игра завершена!</b>\n\nИтоговые баллы:\n"
     for p in game["players"].values():
         text += f"• {p['name']} — {p['points']} баллов\n"
 
-    await callback.message.answer(text, parse_mode="Markdown")
+    await callback.message.answer(text, parse_mode="HTML")
     await callback.answer("Игра завершена.")
 
 
